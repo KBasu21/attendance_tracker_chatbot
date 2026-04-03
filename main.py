@@ -20,10 +20,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.on_event("startup")
-def startup_event():
-    start_scheduler()
-
 @app.get("/")
 def home():
     return {"status": "Attendance Bot is running!"}
@@ -160,7 +156,7 @@ def handle_routine():
         return
 
     response = supabase.table("routine").select("*").eq("day_of_week", current_day).order("start_time").execute()
-    
+
     classes = response.data
     if not classes:
         send_text_message(f"No classes scheduled for today ({current_day})! Enjoy your day off. 🎉")

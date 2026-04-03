@@ -6,6 +6,28 @@ import holidays
 
 wb_holidays = holidays.IN(prov="WB")
 
+def is_today_a_holiday(today_date):
+    """Helper function to check both custom overrides and public holidays."""
+    override_check = supabase.table("custom_events").select("*").eq("date", today_date).execute()
+    
+    if override_check.data:
+        is_holiday = override_check.data[0]['is_holiday']
+        reason = override_check.data[0]['reason']
+        
+        if is_holiday:
+            print(f"Bot resting today (Custom Event): {reason}")
+            return True
+        else:
+            print(f"Override detected: College is open today despite any public holidays.")
+            return False  # Force the bot to stay awake
+            
+    elif today_date in wb_holidays:
+        official_reason = wb_holidays.get(today_date)
+        print(f"Bot resting today (Public Holiday): {official_reason}")
+        return True
+        
+    return False
+
 def check_routine_and_notify():
     now = datetime.now()
     today_date = now.strftime("%Y-%m-%d")
