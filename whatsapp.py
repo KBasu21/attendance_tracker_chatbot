@@ -62,7 +62,7 @@ def send_update_question(subject_code, subject_name):
         "type": "interactive",
         "interactive": {
             "type": "button",
-            "body": {"text": f"Do you want to update the attendance for {subject_name}?"},
+            "body": {"text": f"Do you want to change the attendance for {subject_name}?"},
             "action": {
                 "buttons": [
                     {"type": "reply", "reply": {"id": f"lock_no_{subject_code}", "title": "No"}},

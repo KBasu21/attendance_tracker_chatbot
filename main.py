@@ -67,6 +67,8 @@ async def receive_message(request: Request):
                     handle_percentage()
                 elif text == "TARGET":
                     handle_target()
+                elif text.startswith("CANCEL"):
+                    handle_cancel(text)
 
             # ==========================================
             # 2. HANDLE INTERACTIVE BUTTON CLICKS
@@ -219,3 +221,49 @@ def handle_target():
             msg_text += f"🏃‍♂️ You must attend the next *{classes_to_attend}* classes without fail.\n\n"
 
     send_text_message(msg_text.strip())
+
+def handle_cancel(command_text):
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    current_day = datetime.now().strftime("%A")
+    
+    # 1. Get today's classes
+    routine = supabase.table("routine").select("*").eq("day_of_week", current_day).execute()
+    
+    if not routine.data:
+        send_text_message("You don't have any classes to cancel today!")
+        return
+
+    classes_to_cancel = []
+    
+    # 2. Check if it's "CANCEL ALL" or a specific code
+    if command_text == "CANCEL ALL":
+        classes_to_cancel = routine.data
+        success_msg = "All classes for today have been"
+    else:
+        # Extract the specific code (e.g., "CANCEL CS401" -> "CS401")
+        target_code = command_text.replace("CANCEL ", "").strip()
+        
+        # Search today's routine for that exact code
+        for cls in routine.data:
+            if cls['subject_code'] == target_code:
+                classes_to_cancel.append(cls)
+                
+        if not classes_to_cancel:
+            send_text_message(f"⚠️ Could not find '{target_code}' in today's routine. Check your spelling or try sending ROUTINE first.")
+            return
+            
+        success_msg = f"{classes_to_cancel[0]['subject_name']} ({target_code}) has been"
+
+    # 3. Lock them in the database as Cancelled
+    for cls in classes_to_cancel:
+        log_data = {
+            "date": today_date,
+            "subject_code": cls['subject_code'],
+            "subject_name": cls['subject_name'],
+            "status": "Cancelled",
+            "is_locked": True
+        }
+        supabase.table("attendance_logs").upsert(log_data, on_conflict="date,subject_code").execute()
+
+    # 4. Confirm with the user
+    send_text_message(f"🛑 Done! {success_msg} pre-emptively marked as Cancelled. I won't bother you about it later.")
