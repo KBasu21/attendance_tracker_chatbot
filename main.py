@@ -72,6 +72,10 @@ async def receive_message(request: Request):
                     handle_remove_holiday(text)
                 elif text.startswith("HISTORY"):
                     handle_history(text)
+                elif text == "ABSENT":
+                    handle_absent_menu()
+                elif text == "ABSENT ALL":
+                    handle_mass_absent()
 
             # ==========================================
             # 2. HANDLE INTERACTIVE BUTTON CLICKS
@@ -94,6 +98,28 @@ async def receive_message(request: Request):
                     if button_id == "menu_routine": handle_routine()
                     elif button_id == "menu_percentage": handle_percentage()
                     elif button_id == "menu_target": handle_target()
+                
+                # --- Bulk Absent List Clicks ---
+                elif button_id.startswith("bulk_absent_"):
+                    subject_code = button_id.replace("bulk_absent_", "")
+                    
+                    # Look up the subject name from the routine table to make the message nice
+                    routine = supabase.table("routine").select("subject_name")\
+                        .eq("subject_code", subject_code).execute()
+                    
+                    sub_name = routine.data[0]['subject_name'] if routine.data else "Subject"
+
+                    # Save it as Absent and lock it so the scheduler skips it later
+                    log_data = {
+                        "date": today_date,
+                        "subject_code": subject_code,
+                        "subject_name": sub_name,
+                        "status": "Absent",
+                        "is_locked": True
+                    }
+                    supabase.table("attendance_logs").upsert(log_data, on_conflict="date,subject_code").execute()
+                    
+                    send_text_message(f"✅ Marked *{subject_code}* as Absent.\n\n_Tap another subject from the menu above if you missed others._")
 
                 # --- B. The "Update?" Question Logic ---
                 elif button_id.startswith("lock_"):
@@ -347,3 +373,36 @@ def handle_history(command_text):
         msg_text += f"✅ {log['date']}\n"
 
     send_text_message(msg_text.strip())
+
+def handle_absent_menu():
+    current_day = datetime.now().strftime("%A")
+    routine = supabase.table("routine").select("*").eq("day_of_week", current_day).execute()
+    
+    if not routine.data:
+        send_text_message("You don't have any classes to miss today!")
+        return
+        
+    from whatsapp import send_dynamic_absent_list
+    send_dynamic_absent_list(routine.data, current_day)
+
+def handle_mass_absent():
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    current_day = datetime.now().strftime("%A")
+    
+    routine = supabase.table("routine").select("*").eq("day_of_week", current_day).execute()
+    
+    if not routine.data:
+        send_text_message("You don't have any classes to miss today!")
+        return
+
+    for cls in routine.data:
+        log_data = {
+            "date": today_date,
+            "subject_code": cls['subject_code'],
+            "subject_name": cls['subject_name'],
+            "status": "Absent",
+            "is_locked": True
+        }
+        supabase.table("attendance_logs").upsert(log_data, on_conflict="date,subject_code").execute()
+
+    send_text_message("🛌 Done! All classes for today have been marked as Absent. Get some rest!")
