@@ -57,6 +57,7 @@ async def receive_message(request: Request):
             # ==========================================
             if msg.get("type") == "text":
                 text = msg["text"]["body"].strip().upper()
+                raw_text = msg["text"]["body"].strip()
                 print(f"Bot received text: {text}")
                 
                 if text == "HI":
@@ -69,6 +70,10 @@ async def receive_message(request: Request):
                     handle_target()
                 elif text.startswith("CANCEL"):
                     handle_cancel(text)
+                elif text.startswith("ADD HOLIDAY"):
+                    handle_add_holiday(raw_text)
+                elif text.startswith("REMOVE HOLIDAY"):
+                    handle_remove_holiday(text)
 
             # ==========================================
             # 2. HANDLE INTERACTIVE BUTTON CLICKS
@@ -267,3 +272,39 @@ def handle_cancel(command_text):
 
     # 4. Confirm with the user
     send_text_message(f"🛑 Done! {success_msg} pre-emptively marked as Cancelled. I won't bother you about it later.")
+
+def handle_add_holiday(command_text):
+    # Expected format: "Add Holiday YYYY-MM-DD Reason for holiday"
+    parts = command_text.split(" ", 3)
+    if len(parts) < 4:
+        send_text_message("⚠️ Format incorrect. Please use: ADD HOLIDAY YYYY-MM-DD Reason")
+        return
+        
+    date_str = parts[2]
+    reason = parts[3]
+    
+    supabase.table("custom_events").upsert({
+        "date": date_str,
+        "reason": reason,
+        "is_holiday": True
+    }).execute()
+    
+    send_text_message(f"🌴 Holiday Added: {reason} on {date_str}. I will pause attendance for this day.")
+
+def handle_remove_holiday(command_text):
+    # Expected format: "REMOVE HOLIDAY YYYY-MM-DD"
+    parts = command_text.split(" ")
+    if len(parts) < 3:
+        send_text_message("⚠️ Format incorrect. Please use: REMOVE HOLIDAY YYYY-MM-DD")
+        return
+        
+    date_str = parts[2]
+    
+    # We set is_holiday to FALSE so it overrides any public holidays that day
+    supabase.table("custom_events").upsert({
+        "date": date_str,
+        "reason": "College is Open",
+        "is_holiday": False
+    }).execute()
+    
+    send_text_message(f"✅ Holiday Removed: I will resume tracking classes for {date_str}.")
