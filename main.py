@@ -6,7 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from database import supabase
 from whatsapp import send_text_message, send_interactive_menu, send_update_question
-from scheduler import start_scheduler
+from scheduler import start_scheduler, is_today_a_holiday
 
 
 load_dotenv()
@@ -74,12 +74,23 @@ async def receive_message(request: Request):
                     handle_add_holiday(raw_text)
                 elif text.startswith("REMOVE HOLIDAY"):
                     handle_remove_holiday(text)
+                elif text.startswith("HISTORY"):
+                    handle_history(text)
 
             # ==========================================
             # 2. HANDLE INTERACTIVE BUTTON CLICKS
             # ==========================================
             elif msg.get("type") == "interactive":
-                button_id = msg["interactive"]["button_reply"]["id"]
+                interactive_obj = msg["interactive"]
+                
+                # Check if it's from a list (Reusable Menu) or a button (Attendance/Lock)
+                if "list_reply" in interactive_obj:
+                    button_id = interactive_obj["list_reply"]["id"]
+                elif "button_reply" in interactive_obj:
+                    button_id = interactive_obj["button_reply"]["id"]
+                else:
+                    return {"status": "ignored"}
+
                 today_date = datetime.now().strftime("%Y-%m-%d")
 
                 # --- A. Menu Buttons (ROUTINE, etc.) ---
@@ -140,7 +151,14 @@ async def receive_message(request: Request):
 # ==========================================
 
 def handle_routine():
-    current_day = datetime.now().strftime("%A")
+    now = datetime.now()
+    today_date = now.strftime("%Y-%m-%d")
+    current_day = now.strftime("%A")
+    
+    if is_today_a_holiday(today_date):
+        send_text_message("🌴 It's a holiday today! Chill out and enjoy your day off. 🎮🍿")
+        return
+
     response = supabase.table("routine").select("*").eq("day_of_week", current_day).order("start_time").execute()
     
     classes = response.data
@@ -308,3 +326,28 @@ def handle_remove_holiday(command_text):
     }).execute()
     
     send_text_message(f"✅ Holiday Removed: I will resume tracking classes for {date_str}.")
+
+def handle_history(command_text):
+    # Expected format: "HISTORY CS401"
+    parts = command_text.split(" ")
+    if len(parts) < 2:
+        send_text_message("⚠️ Format incorrect. Please use: HISTORY [SUBJECT_CODE] (e.g., HISTORY CS401)")
+        return
+
+    target_code = parts[1]
+
+    # Query database for days you were specifically 'Present'
+    response = supabase.table("attendance_logs").select("date, subject_name").eq("subject_code", target_code).eq("status", "Present").order("date").execute()
+
+    if not response.data:
+        send_text_message(f"No 'Present' records found for {target_code}.")
+        return
+
+    subject_name = response.data[0]['subject_name']
+    msg_text = f"📅 *Attendance History for {subject_name} ({target_code})*\n\n"
+    msg_text += "You were Present on:\n"
+    
+    for log in response.data:
+        msg_text += f"✅ {log['date']}\n"
+
+    send_text_message(msg_text.strip())

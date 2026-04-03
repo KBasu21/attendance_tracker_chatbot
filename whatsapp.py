@@ -41,13 +41,21 @@ def send_interactive_menu():
         "to": MY_NUMBER,
         "type": "interactive",
         "interactive": {
-            "type": "button",
-            "body": {"text": "Welcome to EchoRoll! Choose one option:"},
+            "type": "list",
+            "header": {"type": "text", "text": "EchoRoll Menu"},
+            "body": {"text": "Choose an option to check your stats. You can return to this menu anytime!"},
+            "footer": {"text": "Select from the list below"},
             "action": {
-                "buttons": [
-                    {"type": "reply", "reply": {"id": "menu_routine", "title": "ROUTINE"}},
-                    {"type": "reply", "reply": {"id": "menu_percentage", "title": "PERCENTAGE"}},
-                    {"type": "reply", "reply": {"id": "menu_target", "title": "TARGET"}},
+                "button": "Open Menu",
+                "sections": [
+                    {
+                        "title": "Your Dashboard",
+                        "rows": [
+                            {"id": "menu_routine", "title": "📅 Routine", "description": "See today's classes"},
+                            {"id": "menu_percentage", "title": "📊 Percentage", "description": "View overall attendance"},
+                            {"id": "menu_target", "title": "🎯 Target", "description": "Classes needed for 75%"}
+                        ]
+                    }
                 ]
             }
         }
