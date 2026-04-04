@@ -4,41 +4,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TOKEN = os.getenv("WHATSAPP_TOKEN")
-PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
-MY_NUMBER = os.getenv("MY_PHONE_NUMBER")
+# We no longer load MY_NUMBER because the bot handles multiple users dynamically!
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+VERSION = os.getenv("VERSION", "v18.0") # Use your specific Meta API version
 
 HEADERS = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Content-Type": "application/json",
+    "Authorization": f"Bearer {ACCESS_TOKEN}",
+    "Content-Type": "application/json"
 }
-URL = f"https://graph.facebook.com/v22.0/{PHONE_ID}/messages"
 
-def ask_attendance(subject_name: str, subject_code: str):
+def get_url():
+    return f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
+
+def send_text_message(text, recipient_number):
     payload = {
         "messaging_product": "whatsapp",
-        "to": MY_NUMBER,
-        "type": "interactive",
-        "interactive": {
-            "type": "button",
-            "body": {"text": f"Did your {subject_name} class happen today? Were you present?"},
-            "action": {
-                "buttons": [
-                    {"type": "reply", "reply": {"id": f"present_{subject_code}_{subject_name}", "title": "Present"}},
-                    {"type": "reply", "reply": {"id": f"absent_{subject_code}_{subject_name}", "title": "Absent"}},
-                    {"type": "reply", "reply": {"id": f"cancelled_{subject_code}_{subject_name}", "title": "Cancelled"}},
-                ]
-            }
-        }
+        "to": recipient_number,
+        "type": "text",
+        "text": {"body": text}
     }
-    response = requests.post(URL, headers=HEADERS, json=payload)
-    print(f"Meta API Response (Menu): {response.status_code} - {response.text}")
-    return response.json()
+    requests.post(get_url(), headers=HEADERS, json=payload)
 
-def send_interactive_menu():
+def send_interactive_menu(recipient_number):
+    """Sends the reusable list menu for routine, percentage, and targets."""
     payload = {
         "messaging_product": "whatsapp",
-        "to": MY_NUMBER,
+        "to": recipient_number,
         "type": "interactive",
         "interactive": {
             "type": "list",
@@ -60,50 +52,95 @@ def send_interactive_menu():
             }
         }
     }
-    response = requests.post(URL, headers=HEADERS, json=payload)
-    print(f"Meta API Response (Menu): {response.status_code} - {response.text}")
+    requests.post(get_url(), headers=HEADERS, json=payload)
 
-def send_update_question(subject_code, subject_name):
+def ask_attendance(subject_name, subject_code, recipient_number):
+    """Sends the 3 buttons when a class ends."""
     payload = {
         "messaging_product": "whatsapp",
-        "to": MY_NUMBER,
+        "to": recipient_number,
         "type": "interactive",
         "interactive": {
             "type": "button",
-            "body": {"text": f"Do you want to change the attendance for {subject_name}?"},
+            "body": {
+                "text": f"Class ended! Did you attend *{subject_name}* ({subject_code})?"
+            },
             "action": {
                 "buttons": [
-                    {"type": "reply", "reply": {"id": f"lock_no_{subject_code}", "title": "No"}},
-                    {"type": "reply", "reply": {"id": f"lock_yes_{subject_code}", "title": "Yes"}},
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": f"present_{subject_code}_{subject_name}",
+                            "title": "✅ Present"
+                        }
+                    },
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": f"absent_{subject_code}_{subject_name}",
+                            "title": "❌ Absent"
+                        }
+                    },
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": f"cancelled_{subject_code}_{subject_name}",
+                            "title": "🚫 Cancelled"
+                        }
+                    }
                 ]
             }
         }
     }
-    requests.post(URL, headers=HEADERS, json=payload)
+    requests.post(get_url(), headers=HEADERS, json=payload)
 
-def send_text_message(text: str):
+def send_update_question(subject_code, subject_name, recipient_number):
+    """Sends the lock/unlock options immediately after marking attendance."""
     payload = {
         "messaging_product": "whatsapp",
-        "to": MY_NUMBER,
-        "type": "text",
-        "text": {"body": text}
+        "to": recipient_number,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {
+                "text": f"Attendance locked for {subject_code}. Do you want to unlock and change it?"
+            },
+            "action": {
+                "buttons": [
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": f"lock_yes_{subject_code}",
+                            "title": "🔓 Yes, change it"
+                        }
+                    },
+                    {
+                        "type": "reply",
+                        "reply": {
+                            "id": f"lock_no_{subject_code}",
+                            "title": "🔒 No, keep it"
+                        }
+                    }
+                ]
+            }
+        }
     }
-    response = requests.post(URL, headers=HEADERS, json=payload)
-    print(f"Meta API Response (Menu): {response.status_code} - {response.text}")
+    requests.post(get_url(), headers=HEADERS, json=payload)
 
-def send_dynamic_absent_list(routine_data, current_day):
-    # We build the list rows dynamically based on today's classes
+def send_dynamic_absent_list(routine_data, current_day, recipient_number):
+    """Generates a dynamic menu based on the user's specific classes for the day."""
     rows = []
     for cls in routine_data:
         rows.append({
             "id": f"bulk_absent_{cls['subject_code']}",
             "title": f"❌ {cls['subject_code']}",
-            "description": cls['subject_name']
+            # Meta limits descriptions to 72 characters, so we slice it just in case
+            "description": cls['subject_name'][:72] 
         })
 
     payload = {
         "messaging_product": "whatsapp",
-        "to": MY_NUMBER,
+        "to": recipient_number,
         "type": "interactive",
         "interactive": {
             "type": "list",
@@ -121,5 +158,4 @@ def send_dynamic_absent_list(routine_data, current_day):
             }
         }
     }
-    import requests
-    requests.post(URL, headers=HEADERS, json=payload)
+    requests.post(get_url(), headers=HEADERS, json=payload)
