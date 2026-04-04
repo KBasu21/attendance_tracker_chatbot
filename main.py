@@ -22,6 +22,7 @@ class ClassItem(BaseModel):
     day_of_week: str
     subject_code: str
     subject_name: str
+    professor_name: str
     start_time: str
     end_time: str
 
@@ -64,6 +65,7 @@ async def sync_routine(payload: SyncRoutinePayload):
                 "day_of_week": cls.day_of_week,
                 "subject_code": cls.subject_code,
                 "subject_name": cls.subject_name,
+                "professor_name": cls.professor_name,
                 "start_time": f"{cls.start_time}:00" if len(cls.start_time) == 5 else cls.start_time,
                 "end_time": f"{cls.end_time}:00" if len(cls.end_time) == 5 else cls.end_time
             })

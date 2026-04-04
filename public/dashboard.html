@@ -8,7 +8,7 @@
 </head>
 <body class="bg-slate-50 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+    <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
         <div class="bg-blue-600 p-6 text-white text-center">
             <h1 class="text-3xl font-bold">EchoRoll Calendar Sync</h1>
             <p class="text-blue-100 mt-2">Build your weekly schedule and connect it to your WhatsApp Bot.</p>
@@ -41,29 +41,33 @@
     </div>
 
     <script>
-        // HTML template for a single class row
+        // HTML template for a single class row (Updated with Professor box)
         const rowTemplate = `
-            <div class="class-row grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm items-center relative group hover:border-blue-300 transition">
-                <div class="md:col-span-2">
+            <div class="class-row grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm items-center relative group hover:border-blue-300 transition">
+                <div>
                     <label class="block text-xs text-gray-500 mb-1">Day</label>
                     <select class="day-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
                         <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
                         <option>Thursday</option><option>Friday</option><option>Saturday</option>
                     </select>
                 </div>
-                <div class="md:col-span-2">
+                <div>
                     <label class="block text-xs text-gray-500 mb-1">Code</label>
                     <input type="text" placeholder="CS401" class="code-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
-                <div class="md:col-span-4">
+                <div>
                     <label class="block text-xs text-gray-500 mb-1">Subject Name</label>
                     <input type="text" placeholder="Operating Systems" class="name-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
-                <div class="md:col-span-2">
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">Professor</label>
+                    <input type="text" placeholder="Dr. Smith" class="prof-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <div>
                     <label class="block text-xs text-gray-500 mb-1">Start</label>
                     <input type="time" class="start-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
-                <div class="md:col-span-2">
+                <div>
                     <label class="block text-xs text-gray-500 mb-1">End</label>
                     <input type="time" class="end-input w-full p-2 border rounded bg-gray-50 outline-none focus:ring-1 focus:ring-blue-500" required>
                 </div>
@@ -75,12 +79,10 @@
 
         const container = document.getElementById('classesContainer');
 
-        // Add the first row automatically
         function addClassRow() {
             container.insertAdjacentHTML('beforeend', rowTemplate);
         }
         
-        // Initialize with one empty row
         addClassRow();
 
         async function syncRoutine() {
@@ -93,7 +95,6 @@
                 return;
             }
 
-            // Gather all data from the rows
             const rows = document.querySelectorAll('.class-row');
             const classesData = [];
             let isValid = true;
@@ -102,6 +103,7 @@
                 const day = row.querySelector('.day-input').value;
                 const code = row.querySelector('.code-input').value.toUpperCase();
                 const name = row.querySelector('.name-input').value;
+                const prof = row.querySelector('.prof-input').value; // <-- Fetches Professor Name
                 const start = row.querySelector('.start-input').value;
                 const end = row.querySelector('.end-input').value;
 
@@ -111,17 +113,17 @@
                     day_of_week: day,
                     subject_code: code,
                     subject_name: name,
+                    professor_name: prof, // <-- Adds it to the JSON payload
                     start_time: start,
                     end_time: end
                 });
             });
 
             if (!isValid || classesData.length === 0) {
-                showStatus('⚠️ Please fill out all fields for your classes.', 'bg-yellow-100 text-yellow-700');
+                showStatus('⚠️ Please fill out all required fields for your classes.', 'bg-yellow-100 text-yellow-700');
                 return;
             }
 
-            // Lock button and show loading
             syncBtn.disabled = true;
             syncBtn.innerHTML = '⏳ Syncing...';
 
@@ -142,7 +144,6 @@
             } catch (error) {
                 showStatus('❌ Error connecting to server. Try again.', 'bg-red-100 text-red-700');
             } finally {
-                // Reset button
                 syncBtn.disabled = false;
                 syncBtn.innerHTML = '<span>🔄</span> Sync with WhatsApp';
             }
