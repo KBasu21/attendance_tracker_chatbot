@@ -134,7 +134,7 @@ def morning_danger_check():
             send_text_message(msg, user_phone)
 
 def start_scheduler():
-    scheduler = BackgroundScheduler(timezone=datetime.now())
+    scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
     
     scheduler.add_job(check_schedule, 'cron', minute="*")
     scheduler.add_job(morning_danger_check, 'cron', hour=8, minute=0)
